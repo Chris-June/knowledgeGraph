@@ -1,0 +1,14 @@
+.next/
+node_modules/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.env
+.env*.local
+.vercel/
+.DS_Store
+output/
+.playwright-mcp/
+knowledge-graph-next-smoke.png
