@@ -203,6 +203,21 @@ export function GraphCanvas({ visibleGraph, dimensions, colors }: GraphCanvasPro
   }, [store.loading, store.preferences.chargeStrength, store.preferences.dagMode, store.preferences.is3D, store.preferences.linkDistance]);
 
   useEffect(() => {
+    if (!store.preferences.is3D) {
+      return;
+    }
+
+    const stopSyntheticDragCleanup = (event: PointerEvent) => {
+      if (!event.isTrusted && event.pointerType === "touch" && event.target === document) {
+        event.stopImmediatePropagation();
+      }
+    };
+
+    document.addEventListener("pointerup", stopSyntheticDragCleanup, true);
+    return () => document.removeEventListener("pointerup", stopSyntheticDragCleanup, true);
+  }, [store.preferences.is3D]);
+
+  useEffect(() => {
     if (store.preferences.is3D || !minimapCanvasRef.current || !runtimeGraph.nodes.length) {
       return;
     }

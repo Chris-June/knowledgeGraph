@@ -8,8 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings 0",
+    "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run lint && npm run typecheck && npm run build",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
     "remotion:preview": "remotion preview",
     "remotion:render": "remotion render"
   },
@@ -51,6 +52,7 @@
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.2.6",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "overrides": {

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getVisibleGraph } from "@/lib/graph/visibility";
 import { useGraphStore } from "@/hooks/use-graph-store";
 
+import { AgentPanel } from "../agents/AgentPanel";
 import { GraphCanvas } from "./GraphCanvas";
 import { GraphSidebar } from "./GraphSidebar";
 
@@ -93,6 +94,7 @@ export function GraphWorkspace() {
         <>
           <GraphSidebar colors={graphColors} />
           <GraphCanvas visibleGraph={visibleGraph} dimensions={dimensions} colors={graphColors} />
+          <AgentPanel />
         </>
       )}
     </main>
