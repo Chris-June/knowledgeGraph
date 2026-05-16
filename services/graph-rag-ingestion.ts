@@ -17,6 +17,13 @@ export type ChunkDocumentResult = {
   importRun: ImportRun;
 };
 
+export function makeEmbeddingSeed(text: string) {
+  return Array.from({ length: 1536 }, (_, index) => {
+    const code = text.charCodeAt(index % Math.max(text.length, 1)) || 0;
+    return ((code + index * 17) % 1000) / 1000;
+  });
+}
+
 export function chunkDocument(input: ChunkDocumentInput): ChunkDocumentResult {
   const now = new Date().toISOString();
   const maxCharacters = input.maxCharacters ?? 900;
@@ -44,7 +51,7 @@ export function chunkDocument(input: ChunkDocumentInput): ChunkDocumentResult {
           text,
           tokenCount: Math.max(1, Math.ceil(text.split(/\s+/).filter(Boolean).length * 1.35)),
           sourceSpan: { start: cursor, end: cursor + text.length },
-          embedding: [],
+          embedding: makeEmbeddingSeed(text),
           visible: true,
           version: 1,
           createdAt: now,

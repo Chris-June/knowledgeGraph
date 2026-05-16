@@ -4,7 +4,9 @@ import {
   type RagGraphEdge,
   type RetrievalContext,
   type RetrievalRun,
+  type ToolExecution,
 } from "@/schemas/graph-rag";
+import { makeEmbeddingSeed } from "@/services/graph-rag-ingestion";
 
 import type { GraphRagRepository } from "./graph-rag-repository";
 
@@ -14,6 +16,7 @@ type RetrievalInput = {
   organizationId: string;
   maxChunks?: number;
   maxHops?: number;
+  requestId?: string;
 };
 
 function tokenize(text: string) {
@@ -55,21 +58,33 @@ export class GraphRagRetrievalService {
   constructor(private readonly repository: GraphRagRepository) {}
 
   async retrieve(input: RetrievalInput): Promise<RetrievalContext> {
+    const startedAt = Date.now();
     const maxChunks = input.maxChunks ?? 5;
     const maxHops = input.maxHops ?? 2;
     const snapshot = await this.repository.getSnapshot(input.ownerId, input.organizationId);
+    const vectorMatches = await this.repository.vectorSearchChunks(
+      input.ownerId,
+      input.organizationId,
+      makeEmbeddingSeed(input.query),
+      maxChunks,
+    );
+    const vectorScores = new Map(vectorMatches.map((match) => [match.chunkId, match.score]));
     const chunkScores = snapshot.chunks
       .filter((chunk) => chunk.visible)
       .map((chunk) => ({
         chunk,
-        score: lexicalScore(input.query, chunk.text),
-        reasons: ["lexical_chunk_match"],
+        score: blendedChunkScore(lexicalScore(input.query, chunk.text), vectorScores.get(chunk.id) ?? 0),
+        reasons: [
+          lexicalScore(input.query, chunk.text) > 0 ? "lexical_chunk_match" : null,
+          vectorScores.has(chunk.id) ? "convex_vector_match" : null,
+        ].filter((reason): reason is string => Boolean(reason)),
       }))
       .sort((a, b) => b.score - a.score || a.chunk.id.localeCompare(b.chunk.id));
 
     const selectedChunks = chunkScores.some((row) => row.score > 0)
       ? chunkScores.filter((row) => row.score > 0).slice(0, maxChunks)
       : chunkScores.slice(0, Math.min(3, maxChunks)).map((row) => ({ ...row, reasons: ["fallback_seed_context"] }));
+    await this.recordToolTrace(input, "search_chunks", startedAt, true, `${selectedChunks.length} chunks`);
     const selectedChunksForContext = selectedChunks.map((row) => ({
       ...row,
       chunk: stripEmbedding(row.chunk),
@@ -120,6 +135,7 @@ export class GraphRagRetrievalService {
         score: edgeScore(edge, Math.min(visited.get(edge.sourceNodeId) ?? maxHops, visited.get(edge.targetNodeId) ?? maxHops)),
       }))
       .sort((a, b) => b.score - a.score);
+    await this.recordToolTrace(input, "expand_graph", startedAt, true, `${retrievedNodes.length} nodes, ${retrievedEdges.length} edges`);
 
     const citations = selectedChunks.map((row) => ({
       chunkId: row.chunk.id,
@@ -162,8 +178,34 @@ export class GraphRagRetrievalService {
     };
 
     await this.repository.saveRetrievalRun(run);
+    await this.recordToolTrace(input, "record_retrieval_trace", startedAt, true, `${context.confidence.toFixed(2)} confidence`);
     return context;
   }
+
+  private async recordToolTrace(input: RetrievalInput, toolName: string, startedAt: number, success: boolean, resultSummary: string) {
+    const execution: ToolExecution = {
+      id: nowId("tool"),
+      ownerId: input.ownerId,
+      organizationId: input.organizationId,
+      requestId: input.requestId,
+      toolName,
+      argsHash: `${toolName}_${input.query.length}_${input.maxChunks ?? 5}`,
+      resultSummary,
+      latencyMs: Date.now() - startedAt,
+      success,
+      createdAt: new Date().toISOString(),
+    };
+
+    await this.repository.saveToolExecution(execution);
+  }
+}
+
+function blendedChunkScore(lexical: number, vector: number) {
+  if (vector <= 0) {
+    return lexical;
+  }
+
+  return Math.min(1, lexical * 0.58 + vector * 0.42);
 }
 
 function labelForChunk(chunk: DocumentChunk) {

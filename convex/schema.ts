@@ -32,6 +32,7 @@ export default defineSchema({
   })
     .index("by_document", ["documentId"])
     .index("by_owner", ["ownerId"])
+    .index("by_organization", ["organizationId"])
     .vectorIndex("by_embedding", {
       vectorField: "embedding",
       dimensions: 1536,
@@ -76,7 +77,9 @@ export default defineSchema({
     fz: v.optional(v.number()),
   })
     .index("by_graph", ["graphId"])
-    .index("by_graph_node", ["graphId", "nodeId"]),
+    .index("by_graph_node", ["graphId", "nodeId"])
+    .index("by_organization", ["organizationId"])
+    .index("by_org_kind", ["organizationId", "kind"]),
   graphLinks: defineTable({
     graphId: v.id("graphs"),
     source: v.string(),
@@ -116,9 +119,64 @@ export default defineSchema({
     provenance: v.string(),
     createdAt: v.string(),
   })
+    .index("by_organization", ["organizationId"])
     .index("by_source", ["sourceNodeId"])
     .index("by_target", ["targetNodeId"])
     .index("by_org_type", ["organizationId", "type"]),
+  graphSuggestions: defineTable({
+    ownerId: v.string(),
+    organizationId: v.string(),
+    sourceChunkId: v.string(),
+    sourceText: v.string(),
+    type: v.union(v.literal("entity"), v.literal("concept"), v.literal("claim"), v.literal("edge")),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+    proposedNode: v.optional(
+      v.object({
+        id: v.string(),
+        kind: v.union(
+          v.literal("chunk"),
+          v.literal("entity"),
+          v.literal("concept"),
+          v.literal("claim"),
+          v.literal("summary"),
+          v.literal("community"),
+          v.literal("memory"),
+        ),
+        label: v.string(),
+        description: v.string(),
+        properties: v.record(v.string(), v.string()),
+        confidence: v.number(),
+      }),
+    ),
+    proposedEdge: v.optional(
+      v.object({
+        sourceNodeId: v.string(),
+        targetNodeId: v.string(),
+        type: v.union(
+          v.literal("MENTIONS"),
+          v.literal("SUPPORTS"),
+          v.literal("DERIVED_FROM"),
+          v.literal("RELATES_TO"),
+          v.literal("CAUSES"),
+          v.literal("DEPENDS_ON"),
+          v.literal("PART_OF"),
+          v.literal("CONTRADICTS"),
+          v.literal("SAME_AS"),
+        ),
+        provenance: v.string(),
+        confidence: v.number(),
+      }),
+    ),
+    rationale: v.string(),
+    confidence: v.number(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+    reviewedAt: v.optional(v.string()),
+    reviewedBy: v.optional(v.string()),
+    rejectionReason: v.optional(v.string()),
+  })
+    .index("by_org_status", ["organizationId", "status"])
+    .index("by_source", ["sourceChunkId"]),
   importRuns: defineTable({
     ownerId: v.string(),
     organizationId: v.string(),
@@ -184,10 +242,13 @@ export default defineSchema({
     retentionPolicy: v.union(v.literal("session"), v.literal("project"), v.literal("organization")),
     createdAt: v.string(),
     updatedAt: v.string(),
-  }).index("by_owner_scope", ["ownerId", "scope"]),
+  })
+    .index("by_owner_scope", ["ownerId", "scope"])
+    .index("by_organization", ["organizationId"]),
   toolExecutions: defineTable({
     ownerId: v.string(),
     organizationId: v.string(),
+    requestId: v.optional(v.string()),
     toolName: v.string(),
     argsHash: v.string(),
     resultSummary: v.string(),
@@ -195,7 +256,10 @@ export default defineSchema({
     success: v.boolean(),
     error: v.optional(v.string()),
     createdAt: v.string(),
-  }).index("by_org_tool", ["organizationId", "toolName"]),
+  })
+    .index("by_org_tool", ["organizationId", "toolName"])
+    .index("by_request", ["requestId"])
+    .index("by_organization", ["organizationId"]),
   graphAuditEvents: defineTable({
     graphId: v.id("graphs"),
     actorId: v.string(),

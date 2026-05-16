@@ -152,6 +152,7 @@ export const toolExecutionSchema = z.object({
   id: z.string().min(1),
   ownerId: z.string().min(1),
   organizationId: z.string().min(1),
+  requestId: z.string().min(1).optional(),
   toolName: z.string().min(1),
   argsHash: z.string().min(1),
   resultSummary: z.string().default(""),
@@ -159,6 +160,46 @@ export const toolExecutionSchema = z.object({
   success: z.boolean(),
   error: z.string().optional(),
   createdAt: z.string().datetime(),
+});
+
+export const graphSuggestionStatusSchema = z.enum(["pending", "approved", "rejected"]);
+
+export const graphSuggestionTypeSchema = z.enum(["entity", "concept", "claim", "edge"]);
+
+export const proposedGraphNodeSchema = z.object({
+  id: z.string().min(1),
+  kind: graphNodeKindSchema,
+  label: z.string().min(1),
+  description: z.string().default(""),
+  properties: z.record(z.string(), z.string()).default({}),
+  confidence: z.number().min(0).max(1),
+});
+
+export const proposedGraphEdgeSchema = z.object({
+  sourceNodeId: z.string().min(1),
+  targetNodeId: z.string().min(1),
+  type: graphEdgeTypeSchema,
+  provenance: z.string().default(""),
+  confidence: z.number().min(0).max(1),
+});
+
+export const graphSuggestionSchema = z.object({
+  id: z.string().min(1),
+  ownerId: z.string().min(1),
+  organizationId: z.string().min(1),
+  sourceChunkId: z.string().min(1),
+  sourceText: z.string().min(1),
+  type: graphSuggestionTypeSchema,
+  status: graphSuggestionStatusSchema,
+  proposedNode: proposedGraphNodeSchema.optional(),
+  proposedEdge: proposedGraphEdgeSchema.optional(),
+  rationale: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  reviewedAt: z.string().datetime().optional(),
+  reviewedBy: z.string().min(1).optional(),
+  rejectionReason: z.string().optional(),
 });
 
 export const agentQueryRequestSchema = z.object({
@@ -191,5 +232,21 @@ export type RetrievalContext = z.infer<typeof retrievalContextSchema>;
 export type RetrievalRun = z.infer<typeof retrievalRunSchema>;
 export type AgentMemory = z.infer<typeof agentMemorySchema>;
 export type ToolExecution = z.infer<typeof toolExecutionSchema>;
+export type GraphSuggestionStatus = z.infer<typeof graphSuggestionStatusSchema>;
+export type GraphSuggestionType = z.infer<typeof graphSuggestionTypeSchema>;
+export type ProposedGraphNode = z.infer<typeof proposedGraphNodeSchema>;
+export type ProposedGraphEdge = z.infer<typeof proposedGraphEdgeSchema>;
+export type GraphSuggestion = z.infer<typeof graphSuggestionSchema>;
 export type AgentQueryRequest = z.infer<typeof agentQueryRequestSchema>;
 export type AgentQueryResponse = z.infer<typeof agentQueryResponseSchema>;
+
+export type GraphRagImportResult = {
+  document: DocumentRecord;
+  chunks: DocumentChunk[];
+  importRun: ImportRun;
+};
+
+export type VectorChunkMatch = {
+  chunkId: string;
+  score: number;
+};

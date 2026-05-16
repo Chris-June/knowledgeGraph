@@ -11,7 +11,6 @@ import {
   type AgentQueryRequest,
   type AgentQueryResponse,
   type RetrievalContext,
-  type ToolExecution,
 } from "@/schemas/graph-rag";
 import { graphRagRepository } from "@/services/graph-rag-repository";
 import { GraphRagRetrievalService } from "@/services/graph-rag-retrieval";
@@ -139,9 +138,9 @@ export class GraphRagAgentRuntime implements AgentRuntime, AiOrchestrator {
       query: parsed.query,
       ownerId: parsed.ownerId,
       organizationId: parsed.organizationId,
+      requestId: context.requestId,
     });
     const memoryWrites: AgentMemory[] = [];
-    const toolExecutions: ToolExecution[] = [];
 
     if (parsed.useModel && process.env.OPENAI_API_KEY) {
       const session = new ConvexBackedAgentSession(parsed.sessionId, graphRagRepository);
@@ -150,6 +149,7 @@ export class GraphRagAgentRuntime implements AgentRuntime, AiOrchestrator {
         session,
         maxTurns: 6,
       });
+      const toolExecutions = await graphRagRepository.getToolExecutionsByRequest(context.requestId, parsed.ownerId, parsed.organizationId);
 
       return agentQueryResponseSchema.parse({
         answer: String(result.finalOutput ?? ""),
@@ -160,6 +160,7 @@ export class GraphRagAgentRuntime implements AgentRuntime, AiOrchestrator {
         usedModel: true,
       });
     }
+    const toolExecutions = await graphRagRepository.getToolExecutionsByRequest(context.requestId, parsed.ownerId, parsed.organizationId);
 
     return agentQueryResponseSchema.parse({
       answer: buildDeterministicAnswer(parsed.query, retrieval),

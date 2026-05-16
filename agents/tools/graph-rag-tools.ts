@@ -68,6 +68,7 @@ async function traceTool(
     id: `tool_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     ownerId: context?.ownerId ?? "local-user",
     organizationId: context?.organizationId ?? "local-org",
+    requestId: context?.requestId,
     toolName,
     argsHash: hashArgs(input),
     resultSummary,
@@ -99,8 +100,9 @@ export function createGraphRagTools(): FunctionTool<GraphRagAgentContext, typeof
           ownerId: context?.ownerId ?? "local-user",
           organizationId: context?.organizationId ?? "local-org",
         });
-        await traceTool(context, "ingest_document", { title: input.title }, startedAt, true, `${result.chunks.length} chunks`);
-        return result;
+        const persisted = await graphRagRepository.saveImportedDocument(result);
+        await traceTool(context, "ingest_document", { title: input.title }, startedAt, true, `${persisted.chunks.length} chunks`);
+        return persisted;
       },
     }),
     tool({
@@ -135,6 +137,7 @@ export function createGraphRagTools(): FunctionTool<GraphRagAgentContext, typeof
           ownerId: context?.ownerId ?? "local-user",
           organizationId: context?.organizationId ?? "local-org",
           maxChunks: input.maxChunks,
+          requestId: context?.requestId,
         });
         await traceTool(context, "search_chunks", input, startedAt, true, `${retrieval.chunks.length} chunks`);
         return retrievalContextSchema.parse(retrieval);
