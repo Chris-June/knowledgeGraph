@@ -7,6 +7,7 @@ import { chunkDocument } from "@/services/graph-rag-ingestion";
 import { graphRagRepository } from "@/services/graph-rag-repository";
 import { GraphRagRetrievalService } from "@/services/graph-rag-retrieval";
 import { GraphRagSuggestionService } from "@/services/graph-rag-suggestions";
+import { GraphRagTraceService } from "@/services/graph-rag-traces";
 
 test("chunking is deterministic for the same document text", () => {
   const first = chunkDocument({
@@ -32,6 +33,7 @@ test("chunking is deterministic for the same document text", () => {
 
 test("retrieval returns chunk nodes, graph expansion, and citations", async () => {
   const service = new GraphRagRetrievalService(graphRagRepository);
+  const traceService = new GraphRagTraceService(graphRagRepository);
   const requestId = "test-retrieval-trace";
   const result = await service.retrieve({
     query: "React Node.js SSR",
@@ -48,6 +50,18 @@ test("retrieval returns chunk nodes, graph expansion, and citations", async () =
   const traces = await graphRagRepository.getToolExecutionsByRequest(requestId, "test-user", "test-org");
   assert.ok(traces.some((trace) => trace.toolName === "search_chunks"));
   assert.ok(traces.some((trace) => trace.toolName === "expand_graph"));
+
+  const runs = await traceService.list({ ownerId: "test-user", organizationId: "test-org", limit: 1 });
+  assert.equal(runs[0]?.requestId, requestId);
+
+  const trace = await traceService.get({
+    runId: runs[0]?.id ?? "",
+    ownerId: "test-user",
+    organizationId: "test-org",
+  });
+  assert.ok(trace);
+  assert.ok(trace.path.length > 0);
+  assert.ok(trace.toolExecutions.some((execution) => execution.toolName === "record_retrieval_trace"));
 });
 
 test("document import persists chunks as graph nodes", async () => {

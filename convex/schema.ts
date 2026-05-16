@@ -194,8 +194,10 @@ export default defineSchema({
     updatedAt: v.string(),
   }).index("by_org_status", ["organizationId", "status"]),
   retrievalRuns: defineTable({
+    runId: v.string(),
     ownerId: v.string(),
     organizationId: v.string(),
+    requestId: v.string(),
     query: v.string(),
     strategy: v.union(v.literal("local_graph"), v.literal("vector_graph"), v.literal("entity_graph"), v.literal("memory_graph")),
     retrievedNodeIds: v.array(v.string()),
@@ -214,7 +216,10 @@ export default defineSchema({
       }),
     ),
     createdAt: v.string(),
-  }).index("by_org", ["organizationId"]),
+  })
+    .index("by_run", ["runId"])
+    .index("by_org", ["organizationId"])
+    .index("by_owner_org", ["ownerId", "organizationId"]),
   agentSessions: defineTable({
     sessionId: v.string(),
     ownerId: v.string(),

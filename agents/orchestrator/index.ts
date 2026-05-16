@@ -14,6 +14,7 @@ import {
 } from "@/schemas/graph-rag";
 import { graphRagRepository } from "@/services/graph-rag-repository";
 import { GraphRagRetrievalService } from "@/services/graph-rag-retrieval";
+import { buildRetrievalTraceFromContext } from "@/services/graph-rag-traces";
 
 export const aiRequestSchema = z.object({
   route: z.string().min(1),
@@ -134,12 +135,13 @@ export class GraphRagAgentRuntime implements AgentRuntime, AiOrchestrator {
       organizationId: parsed.organizationId,
       requestId: `request_${Date.now()}`,
     };
-    const retrieval = await this.retrievalService.retrieve({
+    const retrievalResult = await this.retrievalService.retrieveWithRun({
       query: parsed.query,
       ownerId: parsed.ownerId,
       organizationId: parsed.organizationId,
       requestId: context.requestId,
     });
+    const retrieval = retrievalResult.context;
     const memoryWrites: AgentMemory[] = [];
 
     if (parsed.useModel && process.env.OPENAI_API_KEY) {
@@ -150,10 +152,18 @@ export class GraphRagAgentRuntime implements AgentRuntime, AiOrchestrator {
         maxTurns: 6,
       });
       const toolExecutions = await graphRagRepository.getToolExecutionsByRequest(context.requestId, parsed.ownerId, parsed.organizationId);
+      const trace = buildRetrievalTraceFromContext({
+        run: retrievalResult.run,
+        retrieval,
+        toolExecutions,
+        memoryWrites,
+      });
 
       return agentQueryResponseSchema.parse({
         answer: String(result.finalOutput ?? ""),
         retrieval,
+        retrievalRun: retrievalResult.run,
+        trace,
         toolExecutions,
         memoryWrites,
         sessionId: parsed.sessionId,
@@ -161,10 +171,18 @@ export class GraphRagAgentRuntime implements AgentRuntime, AiOrchestrator {
       });
     }
     const toolExecutions = await graphRagRepository.getToolExecutionsByRequest(context.requestId, parsed.ownerId, parsed.organizationId);
+    const trace = buildRetrievalTraceFromContext({
+      run: retrievalResult.run,
+      retrieval,
+      toolExecutions,
+      memoryWrites,
+    });
 
     return agentQueryResponseSchema.parse({
       answer: buildDeterministicAnswer(parsed.query, retrieval),
       retrieval,
+      retrievalRun: retrievalResult.run,
+      trace,
       toolExecutions,
       memoryWrites,
       sessionId: parsed.sessionId,

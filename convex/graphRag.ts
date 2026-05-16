@@ -59,6 +59,7 @@ const retrievalRunValidator = v.object({
   id: v.string(),
   ownerId: v.string(),
   organizationId: v.string(),
+  requestId: v.string(),
   query: v.string(),
   strategy: v.union(v.literal("local_graph"), v.literal("vector_graph"), v.literal("entity_graph"), v.literal("memory_graph")),
   retrievedNodeIds: v.array(v.string()),
@@ -369,8 +370,10 @@ export const saveRetrievalRun = mutationGeneric({
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("retrievalRuns", {
+      runId: args.run.id,
       ownerId: args.run.ownerId,
       organizationId: args.run.organizationId,
+      requestId: args.run.requestId,
       query: args.run.query,
       strategy: args.run.strategy,
       retrievedNodeIds: args.run.retrievedNodeIds,
@@ -379,6 +382,71 @@ export const saveRetrievalRun = mutationGeneric({
       citations: args.run.citations,
       createdAt: args.run.createdAt,
     });
+  },
+});
+
+export const listRetrievalRuns = queryGeneric({
+  args: {
+    ownerId: v.string(),
+    organizationId: v.string(),
+    limit: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const runs = await ctx.db
+      .query("retrievalRuns")
+      .withIndex("by_owner_org", (query) => query.eq("ownerId", args.ownerId))
+      .filter((query) => query.eq(query.field("organizationId"), args.organizationId))
+      .collect();
+
+    return runs
+      .map((run) => ({
+        id: run.runId,
+        ownerId: run.ownerId,
+        organizationId: run.organizationId,
+        requestId: run.requestId,
+        query: run.query,
+        strategy: run.strategy,
+        retrievedNodeIds: run.retrievedNodeIds,
+        retrievedChunkIds: run.retrievedChunkIds,
+        confidence: run.confidence,
+        citations: run.citations,
+        createdAt: run.createdAt,
+      }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, args.limit);
+  },
+});
+
+export const getRetrievalRun = queryGeneric({
+  args: {
+    runId: v.string(),
+    ownerId: v.string(),
+    organizationId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db
+      .query("retrievalRuns")
+      .withIndex("by_run", (query) => query.eq("runId", args.runId))
+      .filter((query) => query.and(query.eq(query.field("ownerId"), args.ownerId), query.eq(query.field("organizationId"), args.organizationId)))
+      .first();
+
+    if (!run) {
+      return null;
+    }
+
+    return {
+      id: run.runId,
+      ownerId: run.ownerId,
+      organizationId: run.organizationId,
+      requestId: run.requestId,
+      query: run.query,
+      strategy: run.strategy,
+      retrievedNodeIds: run.retrievedNodeIds,
+      retrievedChunkIds: run.retrievedChunkIds,
+      confidence: run.confidence,
+      citations: run.citations,
+      createdAt: run.createdAt,
+    };
   },
 });
 
@@ -761,6 +829,7 @@ export const clearSession = mutationGeneric({
 
 export const searchChunkEmbeddings = actionGeneric({
   args: {
+    ownerId: v.string(),
     organizationId: v.string(),
     embedding: v.array(v.float64()),
     limit: v.number(),

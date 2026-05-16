@@ -112,6 +112,17 @@ export const retrievedEdgeSchema = z.object({
   score: z.number(),
 });
 
+export const graphTracePathStepSchema = z.object({
+  edgeId: z.string().min(1),
+  sourceNodeId: z.string().min(1),
+  sourceLabel: z.string().min(1),
+  targetNodeId: z.string().min(1),
+  targetLabel: z.string().min(1),
+  type: graphEdgeTypeSchema,
+  confidence: z.number().min(0).max(1),
+  provenance: z.string().default(""),
+});
+
 export const retrievalContextSchema = z.object({
   query: z.string().min(1),
   strategy: retrievalStrategySchema,
@@ -127,6 +138,7 @@ export const retrievalRunSchema = z.object({
   id: z.string().min(1),
   ownerId: z.string().min(1),
   organizationId: z.string().min(1),
+  requestId: z.string().min(1),
   query: z.string().min(1),
   strategy: retrievalStrategySchema,
   retrievedNodeIds: z.array(z.string()),
@@ -160,6 +172,18 @@ export const toolExecutionSchema = z.object({
   success: z.boolean(),
   error: z.string().optional(),
   createdAt: z.string().datetime(),
+});
+
+export const retrievalTraceSchema = z.object({
+  run: retrievalRunSchema,
+  chunks: z.array(retrievedChunkSchema),
+  nodes: z.array(retrievedNodeSchema),
+  edges: z.array(retrievedEdgeSchema),
+  path: z.array(graphTracePathStepSchema),
+  citations: z.array(retrievalCitationSchema),
+  toolExecutions: z.array(toolExecutionSchema),
+  memoryWrites: z.array(agentMemorySchema),
+  coverageNotes: z.array(z.string()).default([]),
 });
 
 export const graphSuggestionStatusSchema = z.enum(["pending", "approved", "rejected"]);
@@ -213,6 +237,8 @@ export const agentQueryRequestSchema = z.object({
 export const agentQueryResponseSchema = z.object({
   answer: z.string(),
   retrieval: retrievalContextSchema,
+  retrievalRun: retrievalRunSchema,
+  trace: retrievalTraceSchema,
   toolExecutions: z.array(toolExecutionSchema),
   memoryWrites: z.array(agentMemorySchema),
   sessionId: z.string().min(1),
@@ -228,10 +254,15 @@ export type RagGraphEdge = z.infer<typeof ragGraphEdgeSchema>;
 export type ImportRun = z.infer<typeof importRunSchema>;
 export type RetrievalStrategy = z.infer<typeof retrievalStrategySchema>;
 export type RetrievalCitation = z.infer<typeof retrievalCitationSchema>;
+export type RetrievedChunk = z.infer<typeof retrievedChunkSchema>;
+export type RetrievedNode = z.infer<typeof retrievedNodeSchema>;
+export type RetrievedEdge = z.infer<typeof retrievedEdgeSchema>;
+export type GraphTracePathStep = z.infer<typeof graphTracePathStepSchema>;
 export type RetrievalContext = z.infer<typeof retrievalContextSchema>;
 export type RetrievalRun = z.infer<typeof retrievalRunSchema>;
 export type AgentMemory = z.infer<typeof agentMemorySchema>;
 export type ToolExecution = z.infer<typeof toolExecutionSchema>;
+export type RetrievalTrace = z.infer<typeof retrievalTraceSchema>;
 export type GraphSuggestionStatus = z.infer<typeof graphSuggestionStatusSchema>;
 export type GraphSuggestionType = z.infer<typeof graphSuggestionTypeSchema>;
 export type ProposedGraphNode = z.infer<typeof proposedGraphNodeSchema>;

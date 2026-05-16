@@ -794,6 +794,95 @@ textarea.search-input {
   text-align: center;
 }
 
+.agent-panel__trace-history {
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  padding-top: 16px;
+}
+
+.agent-panel__trace-list {
+  display: grid;
+  gap: 7px;
+}
+
+.agent-panel__trace-list button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(2, 6, 23, 0.34);
+  color: rgba(226, 232, 240, 0.82);
+  border-radius: 8px;
+  padding: 9px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.agent-panel__trace-list button:hover,
+.agent-panel__trace-list button.active {
+  border-color: rgba(45, 212, 191, 0.34);
+  background: rgba(13, 148, 136, 0.12);
+  color: rgba(248, 250, 252, 0.96);
+}
+
+.agent-panel__trace-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.agent-panel__trace-list small {
+  color: #5eead4;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+}
+
+.agent-panel__tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin: 12px 0;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(2, 6, 23, 0.36);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.agent-panel__tabs button {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(203, 213, 225, 0.66);
+  border-radius: 6px;
+  padding: 8px 4px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.agent-panel__tabs button:hover,
+.agent-panel__tabs button.active {
+  background: rgba(59, 130, 246, 0.14);
+  color: #bfdbfe;
+}
+
+.agent-panel__coverage {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.agent-panel__coverage span {
+  border-left: 2px solid rgba(96, 165, 250, 0.46);
+  padding-left: 9px;
+  color: rgba(203, 213, 225, 0.68);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 .agent-panel__chunk,
 .agent-panel__edge {
   border: 1px solid rgba(148, 163, 184, 0.13);
@@ -860,6 +949,73 @@ textarea.search-input {
   line-height: 1.35;
 }
 
+.agent-panel__citations {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.agent-panel__citation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: rgba(191, 219, 254, 0.84);
+  font-size: 0.76rem;
+}
+
+.agent-panel__citation span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-panel__path-step {
+  border: 1px solid rgba(45, 212, 191, 0.15);
+  background: rgba(15, 23, 42, 0.44);
+  border-radius: 8px;
+  padding: 11px;
+  margin-bottom: 8px;
+}
+
+.agent-panel__path-step > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.agent-panel__path-step strong {
+  overflow: hidden;
+  color: rgba(248, 250, 252, 0.9);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-panel__path-step span {
+  border: 1px solid rgba(45, 212, 191, 0.25);
+  background: rgba(13, 148, 136, 0.12);
+  color: #5eead4;
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.62rem;
+}
+
+.agent-panel__path-step p {
+  margin: 7px 0 4px;
+  color: rgba(203, 213, 225, 0.72);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.agent-panel__path-step small {
+  color: rgba(147, 197, 253, 0.72);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.66rem;
+}
+
 .agent-panel__tool {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -905,6 +1061,34 @@ textarea.search-input {
   font-size: 0.68rem;
 }
 
+.agent-panel__memory {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  background: rgba(2, 6, 23, 0.32);
+  border-radius: 8px;
+  padding: 10px;
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.agent-panel__memory svg {
+  color: #5eead4;
+  margin-top: 2px;
+}
+
+.agent-panel__memory strong {
+  color: rgba(248, 250, 252, 0.92);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.72rem;
+}
+
+.agent-panel__memory p {
+  margin: 3px 0 0;
+  color: rgba(203, 213, 225, 0.68);
+  font-size: 0.76rem;
+}
+
 @media (max-width: 760px) {
   .sidebar {
     top: 12px;
@@ -938,5 +1122,9 @@ textarea.search-input {
   .agent-panel__actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .agent-panel__tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

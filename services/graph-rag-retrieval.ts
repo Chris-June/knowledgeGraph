@@ -58,7 +58,13 @@ export class GraphRagRetrievalService {
   constructor(private readonly repository: GraphRagRepository) {}
 
   async retrieve(input: RetrievalInput): Promise<RetrievalContext> {
+    const result = await this.retrieveWithRun(input);
+    return result.context;
+  }
+
+  async retrieveWithRun(input: RetrievalInput): Promise<{ context: RetrievalContext; run: RetrievalRun }> {
     const startedAt = Date.now();
+    const requestId = input.requestId ?? nowId("request");
     const maxChunks = input.maxChunks ?? 5;
     const maxHops = input.maxHops ?? 2;
     const snapshot = await this.repository.getSnapshot(input.ownerId, input.organizationId);
@@ -84,7 +90,7 @@ export class GraphRagRetrievalService {
     const selectedChunks = chunkScores.some((row) => row.score > 0)
       ? chunkScores.filter((row) => row.score > 0).slice(0, maxChunks)
       : chunkScores.slice(0, Math.min(3, maxChunks)).map((row) => ({ ...row, reasons: ["fallback_seed_context"] }));
-    await this.recordToolTrace(input, "search_chunks", startedAt, true, `${selectedChunks.length} chunks`);
+    await this.recordToolTrace({ ...input, requestId }, "search_chunks", startedAt, true, `${selectedChunks.length} chunks`);
     const selectedChunksForContext = selectedChunks.map((row) => ({
       ...row,
       chunk: stripEmbedding(row.chunk),
@@ -135,7 +141,13 @@ export class GraphRagRetrievalService {
         score: edgeScore(edge, Math.min(visited.get(edge.sourceNodeId) ?? maxHops, visited.get(edge.targetNodeId) ?? maxHops)),
       }))
       .sort((a, b) => b.score - a.score);
-    await this.recordToolTrace(input, "expand_graph", startedAt, true, `${retrievedNodes.length} nodes, ${retrievedEdges.length} edges`);
+    await this.recordToolTrace(
+      { ...input, requestId },
+      "expand_graph",
+      startedAt,
+      true,
+      `${retrievedNodes.length} nodes, ${retrievedEdges.length} edges`,
+    );
 
     const citations = selectedChunks.map((row) => ({
       chunkId: row.chunk.id,
@@ -168,6 +180,7 @@ export class GraphRagRetrievalService {
       id: nowId("retrieval"),
       ownerId: input.ownerId,
       organizationId: input.organizationId,
+      requestId,
       query: input.query,
       strategy: context.strategy,
       retrievedNodeIds: context.nodes.map((row) => row.node.id),
@@ -178,8 +191,8 @@ export class GraphRagRetrievalService {
     };
 
     await this.repository.saveRetrievalRun(run);
-    await this.recordToolTrace(input, "record_retrieval_trace", startedAt, true, `${context.confidence.toFixed(2)} confidence`);
-    return context;
+    await this.recordToolTrace({ ...input, requestId }, "record_retrieval_trace", startedAt, true, `${context.confidence.toFixed(2)} confidence`);
+    return { context, run };
   }
 
   private async recordToolTrace(input: RetrievalInput, toolName: string, startedAt: number, success: boolean, resultSummary: string) {

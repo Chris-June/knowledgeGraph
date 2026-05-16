@@ -1,33 +1,109 @@
 "use client";
 
-import { Bot, BrainCircuit, CheckCircle2, Clock3, Database, FileText, Network, Route, Send, ShieldCheck, Sparkles, XCircle } from "lucide-react";
+import {
+  Bot,
+  BrainCircuit,
+  CheckCircle2,
+  Clock3,
+  Database,
+  FileText,
+  History,
+  ListTree,
+  Network,
+  Quote,
+  Route,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  Waypoints,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AIContentRenderer } from "@/components/ai/AIContentRenderer";
-import type { AgentQueryResponse, GraphSuggestion } from "@/schemas/graph-rag";
+import type { AgentQueryResponse, GraphSuggestion, RetrievalRun, RetrievalTrace } from "@/schemas/graph-rag";
+
+type TraceTab = "answer" | "sources" | "path" | "tools" | "memory";
 
 type AgentPanelState = {
   query: string;
   loading: boolean;
+  traceLoading: boolean;
   suggestionsLoading: boolean;
   response: AgentQueryResponse | null;
+  traces: RetrievalRun[];
+  selectedTrace: RetrievalTrace | null;
+  activeTraceTab: TraceTab;
   suggestions: GraphSuggestion[];
   error: string | null;
 };
+
+const traceTabs: Array<{ id: TraceTab; label: string }> = [
+  { id: "answer", label: "Answer" },
+  { id: "sources", label: "Sources" },
+  { id: "path", label: "Graph Path" },
+  { id: "tools", label: "Tools" },
+  { id: "memory", label: "Memory" },
+];
 
 export function AgentPanel() {
   const [state, setState] = useState<AgentPanelState>({
     query: "What connects React and Node.js?",
     loading: false,
+    traceLoading: false,
     suggestionsLoading: false,
     response: null,
+    traces: [],
+    selectedTrace: null,
+    activeTraceTab: "answer",
     suggestions: [],
     error: null,
   });
 
   useEffect(() => {
     void loadSuggestions();
+    void loadTraces();
   }, []);
+
+  async function loadTraces() {
+    try {
+      const response = await fetch("/api/agents/traces?ownerId=local-user&organizationId=local-org&limit=6");
+      if (!response.ok) {
+        throw new Error(`Trace load failed with ${response.status}`);
+      }
+      const data = (await response.json()) as { runs: RetrievalRun[] };
+      setState((current) => ({ ...current, traces: data.runs }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Unknown trace error",
+      }));
+    }
+  }
+
+  async function selectTrace(runId: string) {
+    setState((current) => ({ ...current, traceLoading: true, error: null }));
+
+    try {
+      const response = await fetch(`/api/agents/traces/${runId}?ownerId=local-user&organizationId=local-org`);
+      if (!response.ok) {
+        throw new Error(`Trace detail failed with ${response.status}`);
+      }
+      const data = (await response.json()) as { trace: RetrievalTrace };
+      setState((current) => ({
+        ...current,
+        traceLoading: false,
+        selectedTrace: data.trace,
+        activeTraceTab: "sources",
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        traceLoading: false,
+        error: error instanceof Error ? error.message : "Unknown trace detail error",
+      }));
+    }
+  }
 
   async function loadSuggestions() {
     try {
@@ -136,7 +212,15 @@ export function AgentPanel() {
       }
 
       const data = (await response.json()) as AgentQueryResponse;
-      setState((current) => ({ ...current, loading: false, response: data }));
+      setState((current) => ({
+        ...current,
+        loading: false,
+        response: data,
+        selectedTrace: data.trace,
+        activeTraceTab: "answer",
+        traces: [data.retrievalRun, ...current.traces.filter((run) => run.id !== data.retrievalRun.id)].slice(0, 6),
+      }));
+      void loadTraces();
     } catch (error) {
       setState((current) => ({
         ...current,
@@ -146,7 +230,8 @@ export function AgentPanel() {
     }
   }
 
-  const confidence = state.response ? Math.round(state.response.retrieval.confidence * 100) : 0;
+  const trace = state.selectedTrace ?? state.response?.trace ?? null;
+  const confidence = trace ? Math.round(trace.run.confidence * 100) : state.response ? Math.round(state.response.retrieval.confidence * 100) : 0;
 
   return (
     <aside className="agent-panel" aria-label="Graph-RAG agent panel">
@@ -222,27 +307,48 @@ export function AgentPanel() {
         )}
       </div>
 
-      {state.response ? (
-        <div className="agent-panel__result">
-          <div className="agent-panel__answer">
-            <div className="agent-panel__answer-label">
-              <BrainCircuit size={15} />
-              Answer
-            </div>
-            <AIContentRenderer content={state.response.answer} className="markdown-body" />
+      <div className="agent-panel__section agent-panel__trace-history">
+        <div className="agent-panel__section-head">
+          <h3>
+            <History size={14} /> Trace explorer
+          </h3>
+          <button type="button" onClick={() => void loadTraces()} disabled={state.traceLoading}>
+            {state.traceLoading ? "Loading" : "Refresh"}
+          </button>
+        </div>
+        {state.traces.length > 0 ? (
+          <div className="agent-panel__trace-list" aria-label="Recent retrieval traces">
+            {state.traces.map((run) => (
+              <button
+                type="button"
+                key={run.id}
+                className={trace?.run.id === run.id ? "active" : ""}
+                onClick={() => void selectTrace(run.id)}
+                title={run.query}
+              >
+                <span>{run.query}</span>
+                <small>{Math.round(run.confidence * 100)}%</small>
+              </button>
+            ))}
           </div>
+        ) : (
+          <div className="agent-panel__review-empty">No retrieval traces yet.</div>
+        )}
+      </div>
 
+      {trace ? (
+        <div className="agent-panel__result">
           <div className="agent-panel__metrics">
             <div>
-              <strong>{state.response.retrieval.chunks.length}</strong>
+              <strong>{trace.chunks.length}</strong>
               <span>
                 <Database size={13} /> chunks
               </span>
             </div>
             <div>
-              <strong>{state.response.retrieval.edges.length}</strong>
+              <strong>{trace.path.length}</strong>
               <span>
-                <Network size={13} /> edges
+                <Network size={13} /> path links
               </span>
             </div>
             <div>
@@ -253,53 +359,130 @@ export function AgentPanel() {
             </div>
           </div>
 
-          <div className="agent-panel__section">
-            <h3>
-              <FileText size={14} /> Retrieved chunks
-            </h3>
-            {state.response.retrieval.chunks.slice(0, 4).map((row, index) => (
-              <div key={row.chunk.id} className="agent-panel__chunk">
-                <div className="agent-panel__chunk-head">
-                  <strong>{row.chunk.text.split(".")[0]}</strong>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                </div>
-                <p>{row.chunk.text}</p>
-                <div className="agent-panel__score">
-                  <span style={{ width: `${Math.max(row.score * 100, 8)}%` }} />
-                </div>
-              </div>
+          <div className="agent-panel__tabs" role="tablist" aria-label="Retrieval trace sections">
+            {traceTabs.map((tab) => (
+              <button
+                type="button"
+                key={tab.id}
+                role="tab"
+                aria-selected={state.activeTraceTab === tab.id}
+                className={state.activeTraceTab === tab.id ? "active" : ""}
+                onClick={() => setState((current) => ({ ...current, activeTraceTab: tab.id }))}
+              >
+                {tab.label}
+              </button>
             ))}
           </div>
 
-          <div className="agent-panel__section">
-            <h3>
-              <Route size={14} /> Graph path
-            </h3>
-            {state.response.retrieval.edges.slice(0, 6).map((row) => (
-              <div key={row.edge.id} className="agent-panel__edge">
-                <span>{row.edge.type}</span>
-                <p>{row.edge.provenance || "derived relation"}</p>
+          {state.activeTraceTab === "answer" && (
+            <div className="agent-panel__answer">
+              <div className="agent-panel__answer-label">
+                <BrainCircuit size={15} />
+                Answer
               </div>
-            ))}
-          </div>
+              <AIContentRenderer
+                content={state.response?.retrievalRun.id === trace.run.id ? state.response.answer : `Trace captured for: ${trace.run.query}`}
+                className="markdown-body"
+              />
+              <div className="agent-panel__coverage">
+                {trace.coverageNotes.map((note) => (
+                  <span key={note}>{note}</span>
+                ))}
+              </div>
+            </div>
+          )}
 
-          <div className="agent-panel__section">
-            <h3>
-              <Clock3 size={14} /> Tool trace
-            </h3>
-            {state.response.toolExecutions.map((execution) => (
-              <div key={execution.id} className="agent-panel__tool">
-                <span className={execution.success ? "agent-panel__tool-status success" : "agent-panel__tool-status error"}>
-                  {execution.success ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-                </span>
-                <div>
-                  <strong>{execution.toolName}</strong>
-                  <p>{execution.resultSummary}</p>
+          {state.activeTraceTab === "sources" && (
+            <div className="agent-panel__section">
+              <h3>
+                <FileText size={14} /> Retrieved sources
+              </h3>
+              {trace.chunks.slice(0, 5).map((row, index) => (
+                <div key={row.chunk.id} className="agent-panel__chunk">
+                  <div className="agent-panel__chunk-head">
+                    <strong>{row.chunk.text.split(".")[0]}</strong>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                  </div>
+                  <p>{row.chunk.text}</p>
+                  <div className="agent-panel__score" title={`score ${row.score.toFixed(2)}`}>
+                    <span style={{ width: `${Math.max(row.score * 100, 8)}%` }} />
+                  </div>
                 </div>
-                <time>{execution.latencyMs}ms</time>
+              ))}
+              <div className="agent-panel__citations">
+                {trace.citations.map((citation) => (
+                  <div key={`${citation.documentId}:${citation.chunkId}`} className="agent-panel__citation">
+                    <Quote size={13} />
+                    <span>{citation.label}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {state.activeTraceTab === "path" && (
+            <div className="agent-panel__section">
+              <h3>
+                <Route size={14} /> Graph path
+              </h3>
+              {trace.path.length > 0 ? (
+                trace.path.slice(0, 8).map((step) => (
+                  <div key={step.edgeId} className="agent-panel__path-step">
+                    <div>
+                      <strong>{step.sourceLabel}</strong>
+                      <span>{step.type}</span>
+                      <strong>{step.targetLabel}</strong>
+                    </div>
+                    <p>{step.provenance || "derived relation"}</p>
+                    <small>{Math.round(step.confidence * 100)}% edge confidence</small>
+                  </div>
+                ))
+              ) : (
+                <div className="agent-panel__review-empty">No expanded graph path for this trace.</div>
+              )}
+            </div>
+          )}
+
+          {state.activeTraceTab === "tools" && (
+            <div className="agent-panel__section">
+              <h3>
+                <Clock3 size={14} /> Tool trace
+              </h3>
+              {trace.toolExecutions.map((execution) => (
+                <div key={execution.id} className="agent-panel__tool">
+                  <span className={execution.success ? "agent-panel__tool-status success" : "agent-panel__tool-status error"}>
+                    {execution.success ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                  </span>
+                  <div>
+                    <strong>{execution.toolName}</strong>
+                    <p>{execution.resultSummary}</p>
+                  </div>
+                  <time>{execution.latencyMs}ms</time>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {state.activeTraceTab === "memory" && (
+            <div className="agent-panel__section">
+              <h3>
+                <ListTree size={14} /> Memory writes
+              </h3>
+              {trace.memoryWrites.length > 0 ? (
+                trace.memoryWrites.map((memory) => (
+                  <div key={memory.id} className="agent-panel__memory">
+                    <Waypoints size={14} />
+                    <div>
+                      <strong>{memory.scope}</strong>
+                      <p>{memory.summary}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="agent-panel__review-empty">No memory writes were recorded for this trace.</div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="agent-panel__empty">

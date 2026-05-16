@@ -32,6 +32,8 @@ export interface GraphRagRepository {
   saveImportedDocument(importResult: GraphRagImportResult): Promise<GraphRagImportResult>;
   vectorSearchChunks(ownerId: string, organizationId: string, embedding: number[], limit: number): Promise<VectorChunkMatch[]>;
   saveRetrievalRun(run: RetrievalRun): Promise<void>;
+  listRetrievalRuns(ownerId: string, organizationId: string, limit: number): Promise<RetrievalRun[]>;
+  getRetrievalRun(runId: string, ownerId: string, organizationId: string): Promise<RetrievalRun | null>;
   saveToolExecution(execution: ToolExecution): Promise<void>;
   getToolExecutionsByRequest(requestId: string, ownerId: string, organizationId: string): Promise<ToolExecution[]>;
   saveMemory(memory: AgentMemory): Promise<void>;
@@ -222,7 +224,26 @@ export class LocalGraphRagRepository implements GraphRagRepository, AgentSession
   }
 
   async saveRetrievalRun(run: RetrievalRun) {
+    const existingIndex = this.retrievalRuns.findIndex((candidate) => candidate.id === run.id);
+    if (existingIndex >= 0) {
+      this.retrievalRuns[existingIndex] = run;
+      return;
+    }
+
     this.retrievalRuns.push(run);
+  }
+
+  async listRetrievalRuns(ownerId: string, organizationId: string, limit: number) {
+    return this.retrievalRuns
+      .filter((run) => run.ownerId === ownerId && run.organizationId === organizationId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  }
+
+  async getRetrievalRun(runId: string, ownerId: string, organizationId: string) {
+    return (
+      this.retrievalRuns.find((run) => run.id === runId && run.ownerId === ownerId && run.organizationId === organizationId) ?? null
+    );
   }
 
   async saveToolExecution(execution: ToolExecution) {
@@ -383,6 +404,8 @@ const convexGraphRagFns = {
   ingestDocument: makeFunctionReference<"mutation", GraphRagImportResult, GraphRagImportResult>("graphRag:ingestDocument"),
   searchChunkEmbeddings: makeFunctionReference<"action", VectorSearchArgs, VectorChunkMatch[]>("graphRag:searchChunkEmbeddings"),
   saveRetrievalRun: makeFunctionReference<"mutation", { run: RetrievalRun }, null>("graphRag:saveRetrievalRun"),
+  listRetrievalRuns: makeFunctionReference<"query", ScopeArgs & { limit: number }, RetrievalRun[]>("graphRag:listRetrievalRuns"),
+  getRetrievalRun: makeFunctionReference<"query", ScopeArgs & { runId: string }, RetrievalRun | null>("graphRag:getRetrievalRun"),
   saveToolExecution: makeFunctionReference<"mutation", { execution: ToolExecution }, null>("graphRag:saveToolExecution"),
   getToolExecutionsByRequest: makeFunctionReference<"query", ScopeArgs & { requestId: string }, ToolExecution[]>(
     "graphRag:getToolExecutionsByRequest",
@@ -432,6 +455,20 @@ export class ConvexGraphRagRepository implements GraphRagRepository, AgentSessio
 
   async saveRetrievalRun(run: RetrievalRun) {
     await this.safeConvex(() => this.client.mutation(convexGraphRagFns.saveRetrievalRun, { run }), () => this.fallback.saveRetrievalRun(run));
+  }
+
+  async listRetrievalRuns(ownerId: string, organizationId: string, limit: number) {
+    return this.safeConvex(
+      () => this.client.query(convexGraphRagFns.listRetrievalRuns, { ownerId, organizationId, limit }),
+      () => this.fallback.listRetrievalRuns(ownerId, organizationId, limit),
+    );
+  }
+
+  async getRetrievalRun(runId: string, ownerId: string, organizationId: string) {
+    return this.safeConvex(
+      () => this.client.query(convexGraphRagFns.getRetrievalRun, { runId, ownerId, organizationId }),
+      () => this.fallback.getRetrievalRun(runId, ownerId, organizationId),
+    );
   }
 
   async saveToolExecution(execution: ToolExecution) {
